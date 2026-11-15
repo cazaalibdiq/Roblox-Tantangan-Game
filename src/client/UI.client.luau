@@ -170,6 +170,7 @@ local backdrop = Instance.new("Frame")
 backdrop.Name = "Backdrop"
 backdrop.Size = UDim2.fromScale(1, 1)
 backdrop.BackgroundColor3 = COLORS.bgTop
+backdrop.BackgroundTransparency = 0.45
 backdrop.BorderSizePixel = 0
 backdrop.ZIndex = 1
 backdrop.Parent = gui

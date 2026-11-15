@@ -13,6 +13,7 @@ local COIN_VALUE = 1
 local ARENA_HALF = 36
 local FLOOR_TOP = 1
 local COIN_RADIUS = 2.5
+local SPAWN_POSITION = Vector3.new(0, FLOOR_TOP + 4, ARENA_HALF - 8)
 
 local phase = "LOBBY"
 local phaseEndsAt = os.clock() + LOBBY_SECONDS
@@ -20,6 +21,7 @@ local scores = {}
 local arenaFolder
 local coinFolder
 local obstacleParts = {}
+local spawnLocation
 local maintainCoins
 
 local function broadcast(payload)
@@ -50,7 +52,7 @@ local function makePart(props)
 end
 
 local function clearPreviousArena()
-	for _, name in ipairs({ "CoinRushArena", "CoinRushCoins" }) do
+	for _, name in ipairs({ "CoinRushArena", "CoinRushCoins", "CoinRushSpawn" }) do
 		local existing = workspace:FindFirstChild(name)
 		if existing then
 			existing:Destroy()
@@ -63,7 +65,7 @@ local function buildArena()
 	arenaFolder.Name = "CoinRushArena"
 
 	local floor = makePart({
-		Name = "Floor",
+		Name = "Platform",
 		Size = Vector3.new(ARENA_HALF * 2 + 8, 2, ARENA_HALF * 2 + 8),
 		Position = Vector3.new(0, FLOOR_TOP - 1, 0),
 		Color = Color3.fromRGB(24, 22, 40),
@@ -71,8 +73,59 @@ local function buildArena()
 	})
 	floor.Parent = arenaFolder
 
+	local underlay = makePart({
+		Name = "PlatformBase",
+		Size = Vector3.new(ARENA_HALF * 2 - 2, 8, ARENA_HALF * 2 - 2),
+		Position = Vector3.new(0, FLOOR_TOP - 5, 0),
+		Color = Color3.fromRGB(14, 12, 26),
+		Material = Enum.Material.SmoothPlastic,
+	})
+	underlay.Parent = arenaFolder
+
+	local edgeColor = Color3.fromRGB(255, 199, 39)
+	local gridColor = Color3.fromRGB(64, 54, 102)
+	for index = -3, 3 do
+		local offset = index * 12
+		local lineZ = makePart({
+			Name = "GridLine",
+			Size = Vector3.new(0.12, 0.06, ARENA_HALF * 2),
+			Position = Vector3.new(offset, FLOOR_TOP + 0.03, 0),
+			Color = gridColor,
+			Material = Enum.Material.SmoothPlastic,
+		})
+		lineZ.CanCollide = false
+		lineZ.Parent = arenaFolder
+
+		local lineX = makePart({
+			Name = "GridLine",
+			Size = Vector3.new(ARENA_HALF * 2, 0.06, 0.12),
+			Position = Vector3.new(0, FLOOR_TOP + 0.03, offset),
+			Color = gridColor,
+			Material = Enum.Material.SmoothPlastic,
+		})
+		lineX.CanCollide = false
+		lineX.Parent = arenaFolder
+	end
+
+	local edgeDefs = {
+		{ Vector3.new(0, FLOOR_TOP + 0.05, ARENA_HALF - 0.4), Vector3.new(ARENA_HALF * 2, 0.1, 0.8) },
+		{ Vector3.new(0, FLOOR_TOP + 0.05, -ARENA_HALF + 0.4), Vector3.new(ARENA_HALF * 2, 0.1, 0.8) },
+		{ Vector3.new(ARENA_HALF - 0.4, FLOOR_TOP + 0.05, 0), Vector3.new(0.8, 0.1, ARENA_HALF * 2) },
+		{ Vector3.new(-ARENA_HALF + 0.4, FLOOR_TOP + 0.05, 0), Vector3.new(0.8, 0.1, ARENA_HALF * 2) },
+	}
+	for index, def in ipairs(edgeDefs) do
+		local edge = makePart({
+			Name = "Edge" .. index,
+			Position = def[1],
+			Size = def[2],
+			Color = edgeColor,
+			Material = Enum.Material.Neon,
+		})
+		edge.CanCollide = false
+		edge.Parent = arenaFolder
+	end
+
 	local wallColor = Color3.fromRGB(45, 38, 74)
-	local rimColor = Color3.fromRGB(255, 199, 39)
 	local wallDefs = {
 		{ Vector3.new(0, 4, ARENA_HALF + 2), Vector3.new(ARENA_HALF * 2 + 8, 8, 2) },
 		{ Vector3.new(0, 4, -ARENA_HALF - 2), Vector3.new(ARENA_HALF * 2 + 8, 8, 2) },
@@ -93,17 +146,49 @@ local function buildArena()
 			Name = "Rim" .. index,
 			Position = def[1] + Vector3.new(0, def[2].Y / 2 + 0.15, 0),
 			Size = Vector3.new(def[2].X + 0.4, 0.3, def[2].Z + 0.4),
-			Color = rimColor,
+			Color = edgeColor,
 			Material = Enum.Material.Neon,
 		})
 		rim.CanCollide = false
 		rim.Parent = arenaFolder
 	end
 
+	for _, xSign in ipairs({ -1, 1 }) do
+		for _, zSign in ipairs({ -1, 1 }) do
+			local position = Vector3.new(xSign * (ARENA_HALF - 2), FLOOR_TOP + 5, zSign * (ARENA_HALF - 2))
+			local pillar = makePart({
+				Name = "Pillar",
+				Size = Vector3.new(3, 10, 3),
+				Position = position,
+				Color = wallColor,
+				Material = Enum.Material.SmoothPlastic,
+			})
+			pillar.Parent = arenaFolder
+
+			local cap = makePart({
+				Name = "PillarLight",
+				Size = Vector3.new(3.6, 0.4, 3.6),
+				Position = position + Vector3.new(0, 5.2, 0),
+				Color = edgeColor,
+				Material = Enum.Material.Neon,
+			})
+			cap.CanCollide = false
+			cap.Parent = arenaFolder
+
+			local light = Instance.new("PointLight")
+			light.Color = edgeColor
+			light.Range = 22
+			light.Brightness = 1.4
+			light.Shadows = false
+			light.Parent = cap
+		end
+	end
+
 	local obstacleDefs = {
 		{ Vector3.new(0, FLOOR_TOP + 2.5, -12), Vector3.new(18, 5, 3) },
 		{ Vector3.new(-18, FLOOR_TOP + 2.5, 12), Vector3.new(3, 5, 16) },
 		{ Vector3.new(18, FLOOR_TOP + 2.5, 12), Vector3.new(12, 5, 3) },
+		{ Vector3.new(0, FLOOR_TOP + 3, 4), Vector3.new(6, 6, 6) },
 	}
 	for index, def in ipairs(obstacleDefs) do
 		local obstacle = makePart({
@@ -120,12 +205,25 @@ local function buildArena()
 			Name = "Trim",
 			Position = def[1] + Vector3.new(0, def[2].Y / 2 + 0.12, 0),
 			Size = Vector3.new(def[2].X + 0.3, 0.25, def[2].Z + 0.3),
-			Color = rimColor,
+			Color = edgeColor,
 			Material = Enum.Material.Neon,
 		})
 		trim.CanCollide = false
 		trim.Parent = obstacle
 	end
+
+	spawnLocation = Instance.new("SpawnLocation")
+	spawnLocation.Name = "CoinRushSpawn"
+	spawnLocation.Size = Vector3.new(8, 1, 8)
+	spawnLocation.Position = Vector3.new(0, FLOOR_TOP + 0.5, ARENA_HALF - 8)
+	spawnLocation.Anchored = true
+	spawnLocation.CanCollide = false
+	spawnLocation.CanQuery = false
+	spawnLocation.Transparency = 1
+	spawnLocation.Neutral = true
+	spawnLocation.Enabled = true
+	spawnLocation.Duration = 0
+	spawnLocation.Parent = workspace
 
 	arenaFolder.Parent = workspace
 end
@@ -155,7 +253,7 @@ end
 local function randomCoinPosition()
 	local limit = ARENA_HALF - 6
 	for _ = 1, 24 do
-		local position = Vector3.new(math.random(-limit, limit), FLOOR_TOP + 1.5, math.random(-limit, limit))
+		local position = Vector3.new(math.random(-limit, limit), FLOOR_TOP + 1.6, math.random(-limit, limit))
 		if not insideObstacle(position) and not nearExistingCoin(position) then
 			return position
 		end
@@ -175,8 +273,8 @@ local function spawnCoin()
 	local coin = makePart({
 		Name = "Coin",
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.4, 2.2, 2.2),
-		CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90)),
+		Size = Vector3.new(0.45, 2.4, 2.4),
+		CFrame = CFrame.new(position),
 		Color = Color3.fromRGB(255, 199, 39),
 		Material = Enum.Material.Neon,
 	})
@@ -194,7 +292,7 @@ local function spawnCoin()
 			return
 		end
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		if not humanoid or humanoid.Health <= 0 or hit ~= character:FindFirstChild("HumanoidRootPart") then
+		if not humanoid or humanoid.Health <= 0 then
 			return
 		end
 
@@ -245,9 +343,12 @@ end
 local function teleportToArena(player)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if root then
-		root.CFrame = CFrame.lookAt(Vector3.new(0, FLOOR_TOP + 3, ARENA_HALF - 8), Vector3.new(0, FLOOR_TOP + 3, 0))
+	if not root then
+		return
 	end
+	root.CFrame = CFrame.lookAt(SPAWN_POSITION, Vector3.new(0, FLOOR_TOP + 3, 0))
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
 end
 
 local function startRound()
@@ -294,11 +395,15 @@ end
 
 local function onPlayerAdded(player)
 	scores[player] = 0
+	if spawnLocation and spawnLocation.Parent then
+		player.RespawnLocation = spawnLocation
+	end
 	player.CharacterAdded:Connect(function()
-		if phase == "PLAYING" then
-			task.defer(teleportToArena, player)
-		end
+		task.defer(teleportToArena, player)
 	end)
+	if player.Character then
+		task.defer(teleportToArena, player)
+	end
 	sendCurrentState(player)
 end
 
