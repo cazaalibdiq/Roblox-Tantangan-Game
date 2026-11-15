@@ -52,6 +52,10 @@ local function makePart(props)
 end
 
 local function clearPreviousArena()
+	local baseplate = workspace:FindFirstChild("Baseplate")
+	if baseplate then
+		baseplate:Destroy()
+	end
 	for _, name in ipairs({ "CoinRushArena", "CoinRushCoins", "CoinRushSpawn" }) do
 		local existing = workspace:FindFirstChild(name)
 		if existing then
@@ -119,7 +123,7 @@ local function buildArena()
 			Position = def[1],
 			Size = def[2],
 			Color = edgeColor,
-			Material = Enum.Material.Neon,
+			Material = Enum.Material.SmoothPlastic,
 		})
 		edge.CanCollide = false
 		edge.Parent = arenaFolder
@@ -147,7 +151,7 @@ local function buildArena()
 			Position = def[1] + Vector3.new(0, def[2].Y / 2 + 0.15, 0),
 			Size = Vector3.new(def[2].X + 0.4, 0.3, def[2].Z + 0.4),
 			Color = edgeColor,
-			Material = Enum.Material.Neon,
+			Material = Enum.Material.SmoothPlastic,
 		})
 		rim.CanCollide = false
 		rim.Parent = arenaFolder
@@ -170,7 +174,7 @@ local function buildArena()
 				Size = Vector3.new(3.6, 0.4, 3.6),
 				Position = position + Vector3.new(0, 5.2, 0),
 				Color = edgeColor,
-				Material = Enum.Material.Neon,
+				Material = Enum.Material.SmoothPlastic,
 			})
 			cap.CanCollide = false
 			cap.Parent = arenaFolder
@@ -206,7 +210,7 @@ local function buildArena()
 			Position = def[1] + Vector3.new(0, def[2].Y / 2 + 0.12, 0),
 			Size = Vector3.new(def[2].X + 0.3, 0.25, def[2].Z + 0.3),
 			Color = edgeColor,
-			Material = Enum.Material.Neon,
+			Material = Enum.Material.SmoothPlastic,
 		})
 		trim.CanCollide = false
 		trim.Parent = obstacle
@@ -275,11 +279,19 @@ local function spawnCoin()
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(0.45, 2.4, 2.4),
 		CFrame = CFrame.new(position),
-		Color = Color3.fromRGB(255, 199, 39),
-		Material = Enum.Material.Neon,
+		Color = Color3.fromRGB(255, 190, 30),
+		Reflectance = 0.15,
+		Material = Enum.Material.Metal,
 	})
 	coin.CanCollide = false
 	coin.CastShadow = false
+
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 205, 90)
+	glow.Range = 7
+	glow.Brightness = 0.8
+	glow.Shadows = false
+	glow.Parent = coin
 
 	local claimed = false
 	coin.Touched:Connect(function(hit)
