@@ -153,8 +153,9 @@ local function makeButton(parent, text, layoutOrder)
 end
 
 local function pop(scale)
-	scale.Scale = 0.94
-	TweenService:Create(scale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	local base = scale.Scale
+	scale.Scale = base * 0.94
+	TweenService:Create(scale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = base }):Play()
 end
 
 local function formatClock(seconds)
@@ -173,6 +174,16 @@ gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.DisplayOrder = 10
 gui.Parent = playerGui
+
+local fade = Instance.new("Frame")
+fade.Name = "Fade"
+fade.Size = UDim2.fromScale(1, 1)
+fade.BackgroundColor3 = Color3.new(0, 0, 0)
+fade.BackgroundTransparency = 1
+fade.BorderSizePixel = 0
+fade.Visible = false
+fade.ZIndex = 90
+fade.Parent = gui
 
 local backdrop = Instance.new("Frame")
 backdrop.Name = "Backdrop"
@@ -213,6 +224,28 @@ glowB.ZIndex = 2
 addCorner(glowB, 9999)
 glowB.Parent = backdrop
 
+for index = 1, 10 do
+	local dot = Instance.new("Frame")
+	dot.Name = "UiParticle" .. index
+	local dotSize = math.random(6, 14)
+	local xScale = math.random() * 0.9 + 0.05
+	dot.AnchorPoint = Vector2.new(0.5, 0.5)
+	dot.Size = UDim2.fromOffset(dotSize, dotSize)
+	dot.Position = UDim2.fromScale(xScale, 1.1 + math.random() * 0.2)
+	dot.BackgroundColor3 = COLORS.gold
+	dot.BackgroundTransparency = 0.55 + math.random() * 0.25
+	dot.BorderSizePixel = 0
+	dot.ZIndex = 3
+	addCorner(dot, 9999)
+	dot.Parent = backdrop
+
+	local duration = 8 + math.random() * 6
+	local delayTime = math.random() * duration
+	TweenService:Create(dot, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, -1, false, delayTime), {
+		Position = UDim2.fromScale(xScale, -0.1),
+	}):Play()
+end
+
 local startScreen = Instance.new("Frame")
 startScreen.Name = "StartScreen"
 startScreen.Size = UDim2.fromScale(1, 1)
@@ -233,15 +266,41 @@ makeLabel(startCard, {
 	Text = "MINI GAME  \u{00B7}  60 DETIK",
 })
 
-makeLabel(startCard, {
-	LayoutOrder = 2,
+local titleHolder = Instance.new("Frame")
+titleHolder.Name = "TitleHolder"
+titleHolder.LayoutOrder = 2
+titleHolder.Size = UDim2.new(1, 0, 0, 56)
+titleHolder.BackgroundTransparency = 1
+titleHolder.BorderSizePixel = 0
+titleHolder.Parent = startCard
+
+local startTitle = makeLabel(titleHolder, {
 	Name = "Title",
-	Size = UDim2.new(1, 0, 0, 56),
+	Position = UDim2.fromOffset(0, 0),
+	Size = UDim2.fromScale(1, 1),
 	Font = TITLE_FONT,
 	TextSize = 42,
-	TextColor3 = COLORS.gold,
+	TextScaled = true,
+	TextColor3 = Color3.fromRGB(255, 255, 255),
 	Text = "Coin Rush",
 })
+
+local titleSize = Instance.new("UITextSizeConstraint")
+titleSize.MaxTextSize = 42
+titleSize.MinTextSize = 24
+titleSize.Parent = startTitle
+
+local titleGradient = Instance.new("UIGradient")
+titleGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, COLORS.gold),
+	ColorSequenceKeypoint.new(0.5, COLORS.goldSoft),
+	ColorSequenceKeypoint.new(1, COLORS.gold),
+})
+titleGradient.Parent = startTitle
+
+TweenService:Create(startTitle, TweenInfo.new(1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Position = UDim2.new(0, 0, 0, -5),
+}):Play()
 
 makeLabel(startCard, {
 	LayoutOrder = 3,
@@ -261,7 +320,22 @@ startSpacer.Size = UDim2.new(1, 0, 0, 4)
 startSpacer.BackgroundTransparency = 1
 startSpacer.Parent = startCard
 
-local playButton = makeButton(startCard, "Play", 5)
+local playHolder = Instance.new("Frame")
+playHolder.Name = "PlayHolder"
+playHolder.LayoutOrder = 5
+playHolder.Size = UDim2.new(1, 0, 0, 54)
+playHolder.BackgroundTransparency = 1
+playHolder.BorderSizePixel = 0
+playHolder.Parent = startCard
+
+local playButton = makeButton(playHolder, "Play", 1)
+playButton.Size = UDim2.fromScale(1, 1)
+
+local playPulse = Instance.new("UIScale")
+playPulse.Parent = playHolder
+TweenService:Create(playPulse, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Scale = 1.04,
+}):Play()
 
 local startCountdown = makeLabel(startCard, {
 	LayoutOrder = 6,
@@ -305,6 +379,9 @@ topBar.BorderSizePixel = 0
 topBar.Parent = hud
 addList(topBar, Enum.FillDirection.Horizontal, 12)
 
+local hudScale = Instance.new("UIScale")
+hudScale.Parent = topBar
+
 local function makePill(labelText, layoutOrder)
 	local pill = Instance.new("Frame")
 	pill.Name = labelText .. "Pill"
@@ -314,8 +391,8 @@ local function makePill(labelText, layoutOrder)
 	pill.BackgroundColor3 = COLORS.panel
 	pill.BackgroundTransparency = 0.08
 	pill.BorderSizePixel = 0
-	addCorner(pill, 16)
-	local stroke = addStroke(pill, COLORS.gold, 1, 0.7)
+	addCorner(pill, 22)
+	local stroke = addStroke(pill, COLORS.gold, 1, 0.55)
 	addPadding(pill, 10, 18, 10, 18)
 	addList(pill, Enum.FillDirection.Horizontal, 10)
 
@@ -403,6 +480,26 @@ endScreen.ZIndex = 6
 endScreen.Parent = gui
 
 local endCard, endScale = makeCard(endScreen)
+
+local function updateResponsiveScale()
+	local camera = workspace.CurrentCamera
+	local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
+	hudScale.Scale = math.clamp(viewport.X / 900, 0.6, 1)
+	local cardScale = math.clamp(viewport.Y / 700, 0.72, 1)
+	startScale.Scale = cardScale
+	endScale.Scale = cardScale
+end
+
+local function bindViewportScale()
+	local camera = workspace.CurrentCamera
+	if camera then
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale)
+	end
+end
+
+updateResponsiveScale()
+bindViewportScale()
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindViewportScale)
 
 makeLabel(endCard, {
 	LayoutOrder = 1,
@@ -542,8 +639,10 @@ local function setScore(score, animate)
 	currentScore = score
 	scoreValue.Text = tostring(score)
 	if animate then
-		scoreScale.Scale = 1.12
+		scoreScale.Scale = 1.25
 		TweenService:Create(scoreScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		scoreValue.TextColor3 = Color3.new(1, 1, 1)
+		TweenService:Create(scoreValue, TweenInfo.new(0.3), { TextColor3 = COLORS.gold }):Play()
 	end
 end
 
@@ -580,19 +679,25 @@ local function showCoinPopup(value)
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 1)
 	label.Font = TITLE_FONT
-	label.TextSize = 24
-	label.TextColor3 = COLORS.gold
-	label.TextStrokeTransparency = 0.4
-	label.TextStrokeColor3 = Color3.fromRGB(60, 40, 0)
+	label.TextSize = 22 + currentCombo * 3
+	label.TextColor3 = COLORS.goldSoft
 	label.Text = "+" .. tostring(value)
 	label.Parent = billboard
+
+	local labelStroke = Instance.new("UIStroke")
+	labelStroke.Color = Color3.fromRGB(40, 26, 0)
+	labelStroke.Thickness = 2
+	labelStroke.Transparency = 0.1
+	labelStroke.Parent = label
 
 	TweenService:Create(billboard, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		StudsOffset = Vector3.new(0, 6, 0),
 	}):Play()
 	TweenService:Create(label, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		TextTransparency = 1,
-		TextStrokeTransparency = 1,
+	}):Play()
+	TweenService:Create(labelStroke, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Transparency = 1,
 	}):Play()
 	task.delay(0.65, function()
 		billboard:Destroy()
@@ -614,7 +719,8 @@ local function setSpeedActive(active, duration)
 	end)
 end
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(deltaTime)
+	titleGradient.Rotation = (titleGradient.Rotation + deltaTime * 18) % 360
 	if timerUrgent then
 		timerScale.Scale = 1 + math.sin(os.clock() * 9) * 0.06
 	elseif timerScale.Scale ~= 1 then
@@ -697,27 +803,30 @@ local function rowFor(entry, index)
 	row.LayoutOrder = index
 	row.Size = UDim2.new(1, 0, 0, 40)
 	row.BackgroundColor3 = isLeader and COLORS.gold or Color3.fromRGB(255, 255, 255)
-	row.BackgroundTransparency = isLeader and 0.86 or 0.94
+	row.BackgroundTransparency = isLeader and 0.78 or 0.94
 	row.BorderSizePixel = 0
 	addCorner(row, 10)
+	if isLeader then
+		addStroke(row, COLORS.gold, 1.5, 0.35)
+	end
 
 	makeLabel(row, {
 		Name = "Rank",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.new(0, 26, 0, 20),
+		Size = UDim2.new(0, 46, 0, 20),
 		Font = TITLE_FONT,
 		TextSize = 15,
 		TextColor3 = isLeader and COLORS.gold or COLORS.muted,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = tostring(index),
+		Text = isLeader and "\u{265B} 1" or tostring(index),
 	})
 
 	makeLabel(row, {
 		Name = "PlayerName",
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 46, 0.5, 0),
-		Size = UDim2.new(1, -112, 0, 20),
+		Position = UDim2.new(0, 64, 0.5, 0),
+		Size = UDim2.new(1, -130, 0, 20),
 		Font = BOLD_FONT,
 		TextSize = 14,
 		TextColor3 = COLORS.text,
@@ -765,7 +874,21 @@ local function rebuildBoard(top)
 	for index = 1, math.min(5, #top) do
 		local entry = top[index]
 		if type(entry) == "table" then
-			rowFor(entry, index).Parent = board
+			local row = rowFor(entry, index)
+			row.Visible = false
+			row.Parent = board
+
+			local rowScale = Instance.new("UIScale")
+			rowScale.Scale = 0.9
+			rowScale.Parent = row
+
+			task.delay(0.12 * (index - 1), function()
+				if not row.Parent then
+					return
+				end
+				row.Visible = true
+				TweenService:Create(rowScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			end)
 		end
 	end
 end
@@ -784,7 +907,31 @@ local function showEnd(top)
 	hud.Visible = false
 	waiting.Visible = false
 	endScreen.Visible = true
-	pop(endScale)
+	endCard.Position = UDim2.new(0.5, 0, -0.4, 0)
+	TweenService:Create(endCard, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+	}):Play()
+end
+
+local fadeToken = 0
+local function transition(action)
+	fadeToken += 1
+	local token = fadeToken
+	fade.Visible = true
+	fade.BackgroundTransparency = 1
+	TweenService:Create(fade, TweenInfo.new(0.25), { BackgroundTransparency = 0 }):Play()
+	task.delay(0.25, function()
+		if token ~= fadeToken then
+			return
+		end
+		action()
+		TweenService:Create(fade, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
+		task.delay(0.25, function()
+			if token == fadeToken then
+				fade.Visible = false
+			end
+		end)
+	end)
 end
 
 playButton.MouseButton1Click:Connect(function()
@@ -837,9 +984,9 @@ roundState.OnClientEvent:Connect(function(payload)
 		setScore(0, false)
 		lobbySeconds = type(payload.seconds) == "number" and payload.seconds or nil
 		if awaitingNextRound then
-			showWaiting()
+			transition(showWaiting)
 		else
-			showStart()
+			transition(showStart)
 		end
 		return
 	end
@@ -847,7 +994,9 @@ roundState.OnClientEvent:Connect(function(payload)
 	if kind == "START" then
 		awaitingNextRound = false
 		lobbySeconds = nil
-		showHud(payload.score, payload.seconds)
+		transition(function()
+			showHud(payload.score, payload.seconds)
+		end)
 		return
 	end
 
@@ -865,7 +1014,9 @@ roundState.OnClientEvent:Connect(function(payload)
 	if kind == "END" then
 		awaitingNextRound = false
 		lobbySeconds = nil
-		showEnd(payload.top)
+		transition(function()
+			showEnd(payload.top)
+		end)
 	end
 end)
 

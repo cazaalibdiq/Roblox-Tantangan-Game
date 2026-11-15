@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
 
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local roundState = remotes:WaitForChild("RoundState")
@@ -75,7 +76,38 @@ local function clearPreviousArena()
 	end
 end
 
+local function setupLighting()
+	Lighting.ClockTime = 0
+	Lighting.Ambient = Color3.fromRGB(60, 50, 100)
+	Lighting.OutdoorAmbient = Color3.fromRGB(40, 34, 80)
+	Lighting.Brightness = 1.5
+
+	for _, child in ipairs(Lighting:GetChildren()) do
+		if child:IsA("Atmosphere") or child:IsA("BloomEffect") or child:IsA("ColorCorrectionEffect") then
+			child:Destroy()
+		end
+	end
+
+	local atmosphere = Instance.new("Atmosphere")
+	atmosphere.Density = 0.3
+	atmosphere.Color = Color3.fromRGB(120, 100, 200)
+	atmosphere.Haze = 1
+	atmosphere.Parent = Lighting
+
+	local bloom = Instance.new("BloomEffect")
+	bloom.Intensity = 0.4
+	bloom.Size = 24
+	bloom.Threshold = 1.2
+	bloom.Parent = Lighting
+
+	local colorCorrection = Instance.new("ColorCorrectionEffect")
+	colorCorrection.Saturation = 0.15
+	colorCorrection.Contrast = 0.1
+	colorCorrection.Parent = Lighting
+end
+
 local function buildArena()
+	setupLighting()
 	arenaFolder = Instance.new("Folder")
 	arenaFolder.Name = "CoinRushArena"
 
@@ -96,6 +128,18 @@ local function buildArena()
 		Material = Enum.Material.SmoothPlastic,
 	})
 	underlay.Parent = arenaFolder
+
+	local centerMark = makePart({
+		Name = "CenterMark",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.1, 20, 20),
+		CFrame = CFrame.new(0, FLOOR_TOP - 0.03, 0) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(124, 92, 255),
+		Material = Enum.Material.Neon,
+		Transparency = 0.85,
+	})
+	centerMark.CanCollide = false
+	centerMark.Parent = arenaFolder
 
 	local edgeColor = Color3.fromRGB(176, 130, 24)
 	local gridColor = Color3.fromRGB(64, 54, 102)
@@ -196,6 +240,23 @@ local function buildArena()
 			light.Brightness = 0.8
 			light.Shadows = false
 			light.Parent = cap
+
+			local sparks = Instance.new("ParticleEmitter")
+			sparks.Texture = "rbxasset://textures/particles/sparkles_main.dng"
+			sparks.Rate = 6
+			sparks.Lifetime = NumberRange.new(2)
+			sparks.Speed = NumberRange.new(2)
+			sparks.Color = ColorSequence.new(Color3.fromRGB(255, 199, 39), Color3.fromRGB(150, 110, 255))
+			sparks.Size = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.3),
+				NumberSequenceKeypoint.new(1, 0),
+			})
+			sparks.Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.2),
+				NumberSequenceKeypoint.new(1, 1),
+			})
+			sparks.LightEmission = 1
+			sparks.Parent = cap
 		end
 	end
 
@@ -304,6 +365,19 @@ local function spawnCoin()
 	glow.Shadows = false
 	glow.Parent = coin
 
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Texture = "rbxasset://textures/particles/sparkles_main.dng"
+	sparkle.Rate = 4
+	sparkle.Lifetime = NumberRange.new(0.8)
+	sparkle.Speed = NumberRange.new(1)
+	sparkle.Color = ColorSequence.new(Color3.fromRGB(255, 205, 90))
+	sparkle.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.25),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	sparkle.LightEmission = 1
+	sparkle.Parent = coin
+
 	local claimed = false
 	coin.Touched:Connect(function(hit)
 		if claimed or phase ~= "PLAYING" then
@@ -335,6 +409,7 @@ local function spawnCoin()
 		local value = COIN_VALUE * state.combo
 		scores[player] = (scores[player] or 0) + value
 		coinCollected:FireClient(player, { score = scores[player], combo = state.combo, value = value })
+		coin:SetAttribute("Collected", true)
 		coin:Destroy()
 
 		task.defer(function()
