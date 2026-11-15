@@ -1,12 +1,20 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local roundState = remotes:WaitForChild("RoundState")
 local coinCollected = remotes:WaitForChild("CoinCollected")
+
+local coinSound = Instance.new("Sound")
+coinSound.Name = "CoinPickup"
+coinSound.SoundId = "rbxassetid://9125402735"
+coinSound.Volume = 0.5
+coinSound.Parent = SoundService
 
 local COLORS = {
 	bgTop = Color3.fromRGB(27, 22, 46),
@@ -341,9 +349,13 @@ local function makePill(labelText, layoutOrder)
 end
 
 local scorePill, scoreValue, scoreStroke, scoreScale = makePill("SKOR", 1)
-local timerPill, timerValue, timerStroke = makePill("WAKTU", 2)
+local comboPill, comboValue, comboStroke, comboScale = makePill("KOMBO", 2)
+local timerPill, timerValue, timerStroke, timerScale = makePill("WAKTU", 3)
+local bestPill, bestValue, bestStroke, bestScale = makePill("TERBAIK", 4)
 timerValue.Text = "1:00"
 scoreValue.Text = "0"
+comboValue.Text = "x1"
+bestValue.Text = "0"
 
 local hint = Instance.new("TextLabel")
 hint.Name = "Hint"
@@ -362,6 +374,24 @@ hint.Visible = false
 addCorner(hint, 17)
 addPadding(hint, 7, 18, 7, 18)
 hint.Parent = hud
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Name = "Speed"
+speedLabel.AnchorPoint = Vector2.new(0.5, 0)
+speedLabel.Position = UDim2.new(0.5, 0, 0, 120)
+speedLabel.Size = UDim2.new(0, 0, 0, 26)
+speedLabel.AutomaticSize = Enum.AutomaticSize.X
+speedLabel.BackgroundColor3 = Color3.fromRGB(22, 46, 34)
+speedLabel.BackgroundTransparency = 0.15
+speedLabel.BorderSizePixel = 0
+speedLabel.Font = TITLE_FONT
+speedLabel.TextSize = 16
+speedLabel.TextColor3 = Color3.fromRGB(80, 200, 120)
+speedLabel.Text = "SPEED!"
+speedLabel.Visible = false
+addCorner(speedLabel, 13)
+addPadding(speedLabel, 4, 14, 4, 14)
+speedLabel.Parent = hud
 
 local endScreen = Instance.new("Frame")
 endScreen.Name = "EndScreen"
@@ -487,15 +517,20 @@ local waitingLabel = makeLabel(waiting, {
 waiting.Parent = gui
 
 local currentScore = 0
+local currentCombo = 1
+local bestScore = 0
+local timerUrgent = false
 local lobbySeconds = nil
 local awaitingNextRound = false
 local hintToken = 0
+local speedToken = 0
 
 local function setTimer(seconds)
 	if type(seconds) ~= "number" then
 		return
 	end
 	local urgent = seconds <= 10
+	timerUrgent = urgent
 	timerValue.Text = formatClock(seconds)
 	timerValue.TextColor3 = urgent and COLORS.danger or COLORS.gold
 	timerPill.BackgroundColor3 = urgent and COLORS.dangerPanel or COLORS.panel
@@ -511,6 +546,81 @@ local function setScore(score, animate)
 		TweenService:Create(scoreScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 	end
 end
+
+local function setCombo(combo)
+	combo = math.clamp(combo, 1, 5)
+	local increased = combo > currentCombo
+	currentCombo = combo
+	comboValue.Text = "x" .. combo
+	if increased then
+		comboScale.Scale = 1.25
+		TweenService:Create(comboScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	end
+end
+
+local function showCoinPopup(value)
+	if type(value) ~= "number" then
+		return
+	end
+	local character = player.Character
+	local head = character and (character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart"))
+	if not head then
+		return
+	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CoinPopup"
+	billboard.AlwaysOnTop = true
+	billboard.Size = UDim2.fromOffset(120, 44)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.Adornee = head
+	billboard.Parent = head
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = TITLE_FONT
+	label.TextSize = 24
+	label.TextColor3 = COLORS.gold
+	label.TextStrokeTransparency = 0.4
+	label.TextStrokeColor3 = Color3.fromRGB(60, 40, 0)
+	label.Text = "+" .. tostring(value)
+	label.Parent = billboard
+
+	TweenService:Create(billboard, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		StudsOffset = Vector3.new(0, 6, 0),
+	}):Play()
+	TweenService:Create(label, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+	}):Play()
+	task.delay(0.65, function()
+		billboard:Destroy()
+	end)
+end
+
+local function setSpeedActive(active, duration)
+	speedToken += 1
+	local token = speedToken
+	if not active then
+		speedLabel.Visible = false
+		return
+	end
+	speedLabel.Visible = true
+	task.delay(duration or 5, function()
+		if token == speedToken then
+			speedLabel.Visible = false
+		end
+	end)
+end
+
+RunService.RenderStepped:Connect(function()
+	if timerUrgent then
+		timerScale.Scale = 1 + math.sin(os.clock() * 9) * 0.06
+	elseif timerScale.Scale ~= 1 then
+		timerScale.Scale = 1
+	end
+end)
 
 local function updateStartCountdown()
 	if lobbySeconds then
@@ -569,6 +679,9 @@ end
 local function showHud(score, seconds)
 	setScore(score or 0, false)
 	setTimer(seconds or 60)
+	setCombo(1)
+	speedToken += 1
+	speedLabel.Visible = false
 	backdrop.Visible = false
 	startScreen.Visible = false
 	endScreen.Visible = false
@@ -660,6 +773,12 @@ end
 local function showEnd(top)
 	rebuildBoard(top)
 	ownScoreValue.Text = tostring(currentScore)
+	if currentScore > bestScore then
+		bestScore = currentScore
+	end
+	bestValue.Text = tostring(bestScore)
+	speedToken += 1
+	speedLabel.Visible = false
 	backdrop.Visible = true
 	startScreen.Visible = false
 	hud.Visible = false
@@ -678,11 +797,21 @@ mainLagiButton.MouseButton1Click:Connect(function()
 	showWaiting()
 end)
 
-coinCollected.OnClientEvent:Connect(function(score)
-	if type(score) ~= "number" then
+coinCollected.OnClientEvent:Connect(function(payload)
+	if type(payload) ~= "table" then
 		return
 	end
-	setScore(score, true)
+	if type(payload.score) == "number" then
+		setScore(payload.score, true)
+	end
+	if type(payload.combo) == "number" then
+		setCombo(payload.combo)
+	end
+	if type(payload.value) == "number" then
+		showCoinPopup(payload.value)
+	end
+	coinSound.TimePosition = 0
+	coinSound:Play()
 end)
 
 roundState.OnClientEvent:Connect(function(payload)
@@ -725,6 +854,11 @@ roundState.OnClientEvent:Connect(function(payload)
 	if kind == "TICK" then
 		lobbySeconds = nil
 		setTimer(payload.seconds)
+		return
+	end
+
+	if kind == "POWERUP" then
+		setSpeedActive(payload.active == true, payload.duration)
 		return
 	end
 
